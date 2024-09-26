@@ -1,68 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cat Game</title>
+    <title>เกมยิงมอนสเตอร์</title>
     <style>
         canvas {
-            background: #f0f0f0;
+            border: 1px solid black;
             display: block;
-            margin: 0 auto;
+            margin: auto;
+            background-color: lightblue;
+        }
+
+        #treasureBox, #poisonBox {
+            display: none;
+            position: absolute;
+            background-color: gold;
+            width: 100px;
+            height: 50px;
+            text-align: center;
+            line-height: 50px;
+            font-weight: bold;
+            border: 2px solid black;
+            z-index: 1;
+        }
+
+        #poisonBox {
+            background-color: green; /* สีของไอเทมพิษ */
         }
     </style>
 </head>
 <body>
+
     <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="treasureBox">ตั๋วสมพรปรารถนา</div>
+    <div id="poisonBox">ไอเทมพิษ</div>
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // ตัวแปรสำหรับเกม
+        // สร้างตัวละครแมว
+        let catImage = new Image();
+        catImage.src = 'https://community.gamedev.tv/uploads/db2322/original/3X/a/9/a94a989e070141a536ebf7c8ab52b26cff609935.gif';
+
         let cat = {
             x: 50,
-            y: canvas.height / 2 - 25,
+            y: 200,
             width: 50,
             height: 50,
+            speed: 5,
+            moveUp: false,
+            moveDown: false,
             draw: function () {
-                ctx.fillStyle = 'orange';
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.drawImage(catImage, this.x, this.y, this.width, this.height);
             },
             update: function () {
-                // เพิ่มการเคลื่อนที่ได้ที่นี่
+                if (this.moveUp && this.y > 0) {
+                    this.y -= this.speed;
+                }
+                if (this.moveDown && this.y < canvas.height - this.height) {
+                    this.y += this.speed;
+                }
             }
         };
 
-        let bullets = [];
+        // สร้างมอนสเตอร์
         let monsters = [];
-        let lives = 3;
-        let gameOver = false;
-        let monstersShot = 0;
-
-        // ฟังก์ชันยิงกระสุน
-        function shoot() {
-            let bullet = {
-                x: cat.x + cat.width,
-                y: cat.y + 20,
-                width: 10,
-                height: 5,
-                speed: 5,
-                draw: function () {
-                    ctx.fillStyle = 'black';
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-                }
-            };
-            bullets.push(bullet);
-        }
-
-        // ฟังก์ชันสร้างมอนสเตอร์
+        let monsterSpeed = 3; // ความเร็วของมอนสเตอร์
         function createMonster() {
             let monster = {
                 x: canvas.width,
                 y: Math.random() * (canvas.height - 50),
                 width: 50,
                 height: 50,
-                speed: 2,
                 draw: function () {
                     ctx.fillStyle = 'red';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
@@ -71,36 +82,32 @@
             monsters.push(monster);
         }
 
-        // เพิ่มไอเทมพิเศษ
-        let specialItems = [];
-        function createSpecialItem() {
-            let specialItem = {
-                x: canvas.width,
-                y: Math.random() * (canvas.height - 50),
-                width: 30,
-                height: 30,
-                type: Math.random() > 0.5 ? 'autoShoot' : 'poison', // ประเภท: กระสุนอัตโนมัติหรือพิษ
+        // สร้างกระสุนเพื่อยิงมอนสเตอร์
+        let bullets = [];
+        function shoot() {
+            let bullet = {
+                x: cat.x + cat.width,
+                y: cat.y + cat.height / 2 - 2.5,
+                width: 10,
+                height: 5,
+                speed: 7,
                 draw: function () {
-                    ctx.fillStyle = this.type === 'autoShoot' ? 'green' : 'purple';
+                    ctx.fillStyle = 'yellow';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
             };
-            specialItems.push(specialItem);
+            bullets.push(bullet);
         }
 
-        // ตัวแปรสำหรับสถานะกระสุนอัตโนมัติ
+        // ตัวแปรสำหรับชีวิตและการนับจำนวนมอนสเตอร์ที่ยิงได้
+        let lives = 3;
+        let monstersShot = 0;
+        let treasureBoxVisible = false;
+        let poisonBoxVisible = false;
+        let gameOver = false;
         let autoShootActive = false;
-        let autoShootTimeout;
 
-        // ฟังก์ชันเปิดใช้งานกระสุนอัตโนมัติ
-        function activateAutoShoot() {
-            autoShootActive = true;
-            autoShootTimeout = setTimeout(() => {
-                autoShootActive = false;
-            }, 10000); // เปิดใช้งาน 10 วินาที
-        }
-
-        // ฟังก์ชันอัพเดตเกม
+        // ฟังก์ชันอัพเดตสถานะของเกมในทุกเฟรม
         function updateGame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -108,114 +115,150 @@
             cat.update();
             cat.draw();
 
-            // วาดกระสุนและเคลื่อนที่
+            // วาดกระสุนและทำการเคลื่อนที่
             bullets.forEach((bullet, index) => {
                 bullet.x += bullet.speed;
                 bullet.draw();
                 if (bullet.x > canvas.width) {
-                    bullets.splice(index, 1);
+                    bullets.splice(index, 1); // ลบกระสุนที่ออกนอกจอ
                 }
             });
 
             // วาดและเคลื่อนที่มอนสเตอร์
             monsters.forEach((monster, index) => {
-                monster.x -= monster.speed;
+                monster.x -= monsterSpeed;
                 monster.draw();
 
-                // ตรวจจับการชนระหว่างกระสุนและมอนสเตอร์
+                // ตรวจจับการชนระหว่างกระสุนกับมอนสเตอร์
                 bullets.forEach((bullet, bulletIndex) => {
                     if (bullet.x < monster.x + monster.width &&
                         bullet.x + bullet.width > monster.x &&
                         bullet.y < monster.y + monster.height &&
                         bullet.y + bullet.height > monster.y) {
-                        monsters.splice(index, 1);
-                        bullets.splice(bulletIndex, 1);
-                        monstersShot++;
+                        monsters.splice(index, 1); // ลบมอนสเตอร์ที่โดนยิง
+                        bullets.splice(bulletIndex, 1); // ลบกระสุนที่ยิงโดน
+                        monstersShot++; // เพิ่มจำนวนมอนสเตอร์ที่ยิง
                     }
                 });
 
-                // ตรวจจับการชนระหว่างแมวและมอนสเตอร์
+                // ตรวจจับการชนระหว่างแมวกับมอนสเตอร์
                 if (cat.x < monster.x + monster.width &&
                     cat.x + cat.width > monster.x &&
                     cat.y < monster.y + monster.height &&
                     cat.y + cat.height > monster.y) {
-                    lives--;
-                    monsters.splice(index, 1);
+                    lives--; // ลดชีวิต
+                    monsters.splice(index, 1); // ลบมอนสเตอร์ที่ชน
                     if (lives <= 0) {
-                        gameOver = true;
+                        gameOver = true; // กำหนดว่าเกมจบแล้ว
                     }
                 }
 
                 if (monster.x + monster.width < 0) {
-                    monsters.splice(index, 1);
+                    monsters.splice(index, 1); // ลบมอนสเตอร์ที่วิ่งออกนอกจอ
                 }
             });
 
-            // วาดไอเทมพิเศษ
-            specialItems.forEach((item, index) => {
-                item.x -= 2; // ไอเทมเคลื่อนที่เหมือนมอนสเตอร์
-                item.draw();
-
-                // ตรวจจับการชนระหว่างแมวและไอเทม
-                if (cat.x < item.x + item.width &&
-                    cat.x + cat.width > item.x &&
-                    cat.y < item.y + item.height &&
-                    cat.y + cat.height > item.y) {
-                    if (item.type === 'autoShoot') {
-                        activateAutoShoot(); // เปิดใช้งานกระสุนอัตโนมัติ
-                    } else if (item.type === 'poison') {
-                        monsters.forEach(monster => {
-                            monster.speed += 1; // เพิ่มความเร็วของมอนสเตอร์ทุกตัว
-                        });
-                    }
-                    specialItems.splice(index, 1); // ลบไอเทมที่เก็บแล้ว
-                }
-
-                if (item.x + item.width < 0) {
-                    specialItems.splice(index, 1); // ลบไอเทมที่ออกนอกจอ
-                }
-            });
-
-            // ยิงกระสุนอัตโนมัติ
-            if (autoShootActive && Math.random() < 0.1) {
-                shoot(); // ยิงกระสุนทุก ๆ ประมาณ 0.1 วินาที
-            }
-
-            // แสดงจำนวนชีวิตและมอนสเตอร์ที่ยิงได้
+            // แสดงจำนวนชีวิต
             ctx.fillStyle = 'black';
             ctx.font = '20px Arial';
             ctx.fillText(`Lives: ${'❤️'.repeat(lives)}`, 10, 20);
             ctx.fillText(`Monsters Shot: ${monstersShot}`, 10, 50);
 
-            // ตรวจสอบถ้าเกมจบ
+            // แสดงกล่องสมบัติเมื่อยิงมอนสเตอร์ครบ 100 ตัว
+            if (monstersShot >= 100 && !treasureBoxVisible) {
+                treasureBoxVisible = true;
+                document.getElementById('treasureBox').style.display = 'block';
+                document.getElementById('treasureBox').style.left = `${canvas.width / 2 - 50}px`;
+                document.getElementById('treasureBox').style.top = `${canvas.height / 2 - 25}px`;
+            }
+
+            // แสดงกล่องไอเทมพิษเมื่อยิงมอนสเตอร์ครบ 50 ตัว
+            if (monstersShot >= 50 && !poisonBoxVisible) {
+                poisonBoxVisible = true;
+                document.getElementById('poisonBox').style.display = 'block';
+                document.getElementById('poisonBox').style.left = `${Math.random() * (canvas.width - 100)}px`;
+                document.getElementById('poisonBox').style.top = `${Math.random() * (canvas.height - 50)}px`;
+            }
+
+            // แสดงข้อความ Game Over
             if (gameOver) {
                 ctx.fillStyle = 'red';
                 ctx.font = '30px Arial';
                 ctx.fillText('Game Over!', canvas.width / 2 - 70, canvas.height / 2);
                 ctx.fillText('Click to Restart', canvas.width / 2 - 90, canvas.height / 2 + 40);
-                return;
+                return; // หยุดอัปเดตเกมเมื่อเกมจบ
             }
         }
 
-        // ฟังก์ชัน loop ของเกม
+        // ตรวจจับการกดและปล่อยปุ่มคีย์บอร์ด
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyW') {
+                cat.moveUp = true;
+            }
+            if (e.code === 'KeyS') {
+                cat.moveDown = true;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'KeyW') {
+                cat.moveUp = false;
+            }
+            if (e.code === 'KeyS') {
+                cat.moveDown = false;
+            }
+        });
+
+        // Loop ของเกมทำงานอย่างต่อเนื่อง
         function gameLoop() {
             updateGame();
             requestAnimationFrame(gameLoop);
         }
 
-        // เริ่มต้นเกม
-        setInterval(createMonster, 2000); // สร้างมอนสเตอร์ทุก 2 วินาที
-        setInterval(createSpecialItem, 5000); // สร้างไอเทมพิเศษทุก 5 วินาที
-        canvas.addEventListener('click', () => {
+        // สร้างมอนสเตอร์ใหม่ทุก ๆ 2 วินาที
+        let monsterCreationInterval = setInterval(createMonster, 2000);
+
+        // ตรวจจับการคลิกเพื่อยิงกระสุน
+        canvas.addEventListener('click', (event) => {
             if (gameOver) {
-                location.reload(); // รีโหลดหน้าเว็บเพื่อเริ่มเกมใหม่
+                // รีเซ็ตค่าเกม
+                lives = 3;
+                monstersShot = 0;
+                gameOver = false;
+                monsters = [];
+                bullets = [];
+                treasureBoxVisible = false;
+                poisonBoxVisible = false;
+                document.getElementById('treasureBox').style.display = 'none'; // ซ่อนกล่องสมบัติ
+                document.getElementById('poisonBox').style.display = 'none'; // ซ่อนกล่องไอเทมพิษ
+                monsterSpeed = 3; // รีเซ็ตความเร็วของมอนสเตอร์
+                clearInterval(monsterCreationInterval); // หยุดการสร้างมอนสเตอร์ใหม่
+                monsterCreationInterval = setInterval(createMonster, 2000); // เริ่มสร้างมอนสเตอร์ใหม่
             } else {
-                shoot(); // ยิงกระสุนเมื่อคลิก
+                shoot(); // ยิงกระสุน
+                if (autoShootActive) {
+                    shoot(); // ยิงกระสุนออกมาอัตโนมัติ
+                }
             }
         });
 
-        // เริ่มต้น loop ของเกม
+        // ฟังก์ชันสำหรับตรวจจับกล่องสมบัติ
+        document.getElementById('treasureBox').addEventListener('click', () => {
+            treasureBoxVisible = false;
+            document.getElementById('treasureBox').style.display = 'none'; // ซ่อนกล่องสมบัติ
+            autoShootActive = true; // เปิดฟีเจอร์ยิงอัตโนมัติ
+        });
+
+        // ฟังก์ชันสำหรับตรวจจับกล่องไอเทมพิษ
+        document.getElementById('poisonBox').addEventListener('click', () => {
+            poisonBoxVisible = false;
+            document.getElementById('poisonBox').style.display = 'none'; // ซ่อนกล่องไอเทมพิษ
+            monsterSpeed += 1; // เพิ่มความเร็วของมอนสเตอร์
+        });
+
+        // เริ่มเกม
         gameLoop();
     </script>
+
 </body>
 </html>
